@@ -6,6 +6,11 @@ availabe data by accesing it via API, parse the data and make
 a graph with help of matplotlib
 """
 
+from __future__ import print_function
+import requests
+
+CPI_DATA_URL = "http://research.stlouisfed.org/fred2/data/CPIAUCSL.txt"
+
 def main():
     """This function handles the logic of this script"""
 
