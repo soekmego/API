@@ -13,11 +13,18 @@ CPI_DATA_URL = "http://research.stlouisfed.org/fred2/data/CPIAUCSL.txt"
 
 class CPIData(object):
     """Abstraction of the CPI data provided by FRED.
-    This stores internally only one value per year
+    This stores internally only one value per year.
+    The CPI is the consumer price index.
     """
 
     def __init__(self):
+        #Each year available to the dataset will end up as a simple key-value
+        #pair within this dict.
         self.year_cpi = {}
+
+        #Later on we will also remember the first and the last year we
+        #have found in the dataset to handle years prior or after the
+        #documented time span.
         self.last_year = None
         self.first_year = None
 
