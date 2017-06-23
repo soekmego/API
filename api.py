@@ -38,6 +38,30 @@ class CPIData(object):
         internally
         """
 
+        #We don't really know how much data we are going to get here, so
+        #it is recommended to just keep as little data as possible in the memory
+        #at all times. Since python-requests supports gzip-compression by
+        #default and decoding these chunks on their own isn't that easy,
+        #we just disable gzip with empty "Accept-Encoding" header.
+        fp = requests.get(url, stream=True,
+                        headers={"Accept-Encoding": None}).raw
+
+        #If we did not pass in a save_as_file parameter, we just return the
+        #raw data we got from the previous line.
+        if save_as_file is None:
+            return self.load_from_file(fp)
+
+        #Else, we write to the desired file.
+        else:
+            with open(save_as_file, "wb+") as out:
+                while True:
+                    buffer = fp.read(81920)
+                    if not buffer:
+                        break
+                    out.write(buffer)
+            with open(save_as_file) as fp:
+                return self.load__from_file(fp)
+
     def load_from_file(self, fp):
         """Loads CPI data from a given file-like object"""
 
