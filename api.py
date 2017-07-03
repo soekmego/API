@@ -7,12 +7,15 @@ a graph with help of matplotlib
 """
 
 from __future__ import print_function
-import requests
+
+import argparse
 import logging
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tablib
-import argparse
+import requests
 
 CPI_DATA_URL = "http://research.stlouisfed.org/fred2/data/CPIAUCSL.txt"
 
@@ -48,27 +51,26 @@ class CPIData(object):
         #at all times. Since python-requests supports gzip-compression by
         #default and decoding these chunks on their own isn't that easy,
         #we just disable gzip with empty "Accept-Encoding" header.
-        fp = requests.get(url, stream=True,
-                        headers={"Accept-Encoding": None}).raw
+        response = requests.get(url, stream=True,
+                        headers={"Accept-Encoding": None})
 
         #If we did not pass in a save_as_file parameter, we just return the
         #raw data we got from the previous line.
         if save_as_file is None:
-            return self.load_from_file(fp)
+            return self.load_from_file(response.raw)
 
         #Else, we write to the desired file.
         else:
+            buffer_size = 4 * 1024
             with open(save_as_file, "wb+") as out:
-                while True:
-                    buffer = fp.read(81920)
-                    if not buffer:
-                        break
-                    out.write(buffer)
+                for chunk in response.iter_content(buffer_size):
+                    out.write(chunk)
             with open(save_as_file) as fp:
                 return self.load__from_file(fp)
 
     def load_from_file(self, fp):
         """Loads CPI data from a given file-like object"""
+        reached_dataset = False
         current_year = None
         year_cpi = []
 
@@ -76,8 +78,11 @@ class CPIData(object):
             #The actual content of the file starts with a header line
             #starting with the string "DATE". Until we reach this line,
             #we can skip ahead
-            while not line.startswith("DATE"):
-                pass
+            if not reached_dataset:
+                if line.startswith("DATE "):
+                    reached_dataset = True
+                continue
+
         #Each line ends with a new-line character which we strip here
         #to make the data usable easier.
         data = line.rstrip().split()
@@ -158,13 +163,13 @@ class GiantbombAPI(object):
         if sort is not None:
             params["sort"] = sort
         if field_list is not None:
-            param["field_list"] = ",".join(field_list)
+            params["field_list"] = ",".join(field_list)
         if filter is not None:
             params["filter"] = filter
             parsed_filters = []
-        for key, value in filter.iteritems():
-            parsed_filters.append("{0}:{1}".format(key, value))
-        params["filter"] = ",".join(parsed_filters)
+            for key, value in filter.iteritems():
+                parsed_filters.append("{0}:{1}".format(key, value))
+            params["filter"] = ",".join(parsed_filters)
 
         #Last but not least we append our API key to the list of parameters
         #and tell the API that we would like to have our data returned
@@ -355,7 +360,7 @@ def main():
 
     if os.path.exists(opts.cpi_file):
         with open(opts.cpi_file) as fp:
-            cpi_data.load__from_file(fp)
+            cpi_data.load_from_file(fp)
     else:
         cpi_data.load_from_url(opts.cpi_data_url, save_as_file=opts.cpi_file)
 
