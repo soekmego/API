@@ -12,6 +12,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import tablib
+import argparse
 
 CPI_DATA_URL = "http://research.stlouisfed.org/fred2/data/CPIAUCSL.txt"
 
@@ -269,8 +270,20 @@ def generate_csv(platforms, output_file):
     The output_file can either be the path to a file or a file-like object.
     
     """
-    ### TODO ###
-    ### ### ###
+    dataset = tablib.Dataset(header=["Abbreviation", "Name", "Year", "Price",
+                                    "Adjusted price"])
+    for p in platforms:
+        dataset.append(p[["abbreviation"], p["name"], p["year"],
+                        p["original_price"], p["adjusted_price"]])
+
+    # If the output_file is a string it represents a path to a file which
+    # we will have to open first for writing. Otherwise we just assume that
+    # it is already a file-like object and write the data into it.
+    if isinstance(output_file, basestring):
+        with open(output_file, "w+") as fp:
+            fp.write(dataset.csv)
+    else:
+        output_file.write(dataset.csv)
 
 def is_valid_dataset(platform):
     """Filters out datasets that we can't use since they are either lacking
@@ -292,20 +305,77 @@ def is_valid_dataset(platform):
         return False
     return True
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--giantbomb-api-key", required=True,
+                        help="API key provided by Giantbomb.com")
+    parser.add_argument("--cpi-file",
+                        default=os.path.join(os.path.dirname(__file__),
+                                            "CPIAUCSL.txt"),
+                        help="Path to file containing the CPI data (also acts"
+                            " as target file if the data has to be downloaded"
+                            " first).")
+    parser.add_argument("--cpi-data-url", default=CPI_DATA_URL,
+                        help="URL which should be usedas CPI data source")
+    parser.add_argument("--debug", default=False, action="store_true",
+                        help="Increases the output level.")
+    parser.add_argument("--csv-file",
+                        help="Path to CSV file which should contain the data"
+                        " output")
+    parser.add_argument("--plot-file",
+                        help="Path to the PNG file which should contain the"
+                        " data output")
+    parser.add_argument("--limit", type=int,
+                        help="Number of recent platforms to be considered")
+    opts = parser.parse_args()
+    if not (opts.plot_file or opts.csv_file):
+        parse.error("You have to specify either a --csv-file or --plot-file!")
+    return opts
+
 
 def main():
     """This function handles the logic of this script"""
+    opts = parse_args()
+
+    if opts.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     #Grab CPI/inflation data
+    cpi_data = CPIData()
 
     #Grab API/game platform data
+    gb_api = GiantbombAPI(opts.giantbomb_api_key)
 
-    #Figure out the current price of each platform.
-    #This will require looping through each game platform we received,
-    #and calculate the adjusted price based on the CPI data we also
-    #received.
-    #During this point we also validate our data so we do not skew
-    #our results.
+    print ("Disclaimer: This script uses data provided by FRED, Federal"
+            " Reserve Economic Data, from the Federal Reserve Bank of St. Louis"
+            " and Giantbomb.com:\n- {0}\n- http://www.giantbomb.com/api/\n"
+            .format(CPI_DATA_URL))
+
+    if os.path.exists(opts.cpi_file):
+        with open(opts.cpi_file) as fp:
+            cpi_data.load__from_file(fp)
+    else:
+        cpi_data.load_from_url(opts.cpi_data_url, save_as_file=opts.cpi_file)
+
+    platforms = []
+    counter = 0
+
+    # Now that we have everything in place, fetch the platforms and calculate
+    # their current price in relation to the CPI value
+    for platform in gb_api.get_plarforms(sort="release_date:desc",
+                                        field_list=["release_date",
+                                                    "original_price",
+                                                    "name",
+                                                    "abbreviation"]):
+        # Some platforms don't have a release date or price yet. These we have
+        # to skip.
+        if not is_valid_dataset(platform):
+            continue
+
+        
+
 
     #Generate a plot/bar graph for adjusted price data.
 
