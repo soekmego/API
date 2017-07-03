@@ -374,12 +374,27 @@ def main():
         if not is_valid_dataset(platform):
             continue
 
-        
+        year = int(platform["release_date"].split("-")[0])
+        price = platform["original_price"]
+        adjusted_price = cpi.data.get_adjusted_price(price, year)
+        platform["year"] = year
+        platform["original_price"] = price
+        platform["adjusted_price"] = adjusted_price
+        platforms.append(platform)
 
+        # We limit the resultset on this end since we can only here check
+        # if the dataset actually contains all the data we need and therefor
+        # can't filter on the API level.
+        if opts.limit is not None and counter + 1 >= opts.limit:
+            break
+        counter += 1
 
     #Generate a plot/bar graph for adjusted price data.
-
-    #Generate a CSV file to save for the adjusted price data.
+    #Generate a CSV file to save for the adjusted price data
+    if opts.plot_file:
+        generate_plot(platforms, opts.plot_file)
+    if opts.csv_file:
+        generate_csv(platforms, opts.csv_file)
 
 if __name__ == "__main__":
     main()
